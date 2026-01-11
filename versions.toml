@@ -1,0 +1,54 @@
+[versions]
+# =============================================
+# CENTRALIZED VERSION MANAGEMENT
+# All versions in one place - update here only
+# =============================================
+
+# ----- Java/JVM -----
+java = "21"
+gradle = "8.14"
+spring-boot = "4.0.1"
+spring-dependency-management = "1.1.7"
+
+# ----- Database -----
+postgresql = "42.7.3"
+jooq = "3.19.3"
+hikaricp = "6.0.0"
+
+# ----- Vert.x & Reactive -----
+vertx = "4.5.8"
+rxjava = "3.1.8"
+
+# ----- Security -----
+jwt = "0.12.5"
+spring-security = "6.4.0"
+
+# ----- gRPC & Protobuf -----
+grpc = "1.63.0"
+protobuf = "3.25.3"
+protobuf-plugin = "0.9.4"
+
+# ----- Logging -----
+slf4j = "2.0.13"
+logback = "1.5.6"
+
+# ----- Testing -----
+junit = "5.10.2"
+mockito = "5.11.0"
+
+# ----- Go -----
+go = "1.25"
+goose = "3.20.0"
+sqlc = "1.30.0"
+viper = "1.19.0"
+dig = "1.18.0"
+gin = "1.10.0"
+pgx = "5.5.5"
+uuid = "1.6.0"
+
+# ----- Docker Images -----
+postgres-image = "pgvector/pgvector:pg16"
+redis-image = "redis:7-alpine"
+java-base-image = "amazoncorretto:21-alpine"
+go-base-image = "golang:1.25-alpine"
+alpine-base = "alpine:3.19"

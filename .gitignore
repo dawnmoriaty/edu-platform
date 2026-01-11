@@ -1,0 +1,44 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+**/build/
+**/target/
+**/bin/
+**/out/
+*.jar
+*.war
+*.class
+
+# Logs
+*.log
+logs/
+
+# Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Generated code (keep structure, ignore generated files)
+**/entity-share/src/main/java/**/jooq/*.java
+**/db/sqlc/*.go
+
+# Docker
+docker-compose.override.yml
+
+# Application specific
+application-local.yml
+application-local.properties

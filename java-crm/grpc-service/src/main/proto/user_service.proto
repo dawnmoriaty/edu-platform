@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package com.eduplatform.grpc.user;
+
+option java_multiple_files = true;
+option java_package = "com.eduplatform.grpc.user";
+option java_outer_classname = "UserServiceProto";
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse);
+  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse);
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message UserResponse {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string first_name = 4;
+  string last_name = 5;
+  bool active = 6;
+}
+
+message ValidateUserRequest {
+  string token = 1;
+}
+
+message ValidateUserResponse {
+  bool valid = 1;
+  string user_id = 2;
+}
+
+message GetUserRolesRequest {
+  string user_id = 1;
+}
+
+message GetUserRolesResponse {
+  repeated string roles = 1;
+}

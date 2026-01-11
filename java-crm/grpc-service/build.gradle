@@ -1,0 +1,41 @@
+plugins {
+    alias(libs.plugins.protobuf)
+}
+
+dependencies {
+    // gRPC
+    implementation libs.bundles.grpc
+    
+    // Annotations for generated code
+    implementation libs.javax.annotation.api
+    
+    // Spring
+    implementation libs.spring.context
+    implementation libs.spring.boot
+    
+    // Jakarta Annotation
+    implementation libs.jakarta.annotation.api
+    
+    // Entity Share
+    implementation project(':entity-share')
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.java.get()}"
+    }
+    
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${libs.versions.grpc.get()}"
+        }
+    }
+    
+    generateProtoTasks {
+        all().each { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}

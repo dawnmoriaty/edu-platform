@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # 1. Database (PostgreSQL + Vector)
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: edu_postgres_dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
+      POSTGRES_DB: ${POSTGRES_DB:-edu_crm_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edu_network
+
+  # 2. Redis (Cache)
+  redis:
+    image: redis:7-alpine
+    container_name: edu_redis_dev
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edu_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  edu_network:
+    driver: bridge

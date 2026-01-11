@@ -1,0 +1,7 @@
+dependencies {
+    // CRM Domain
+    implementation project(':crm-module:crm-domain')
+    
+    // Shared Kernel
+    implementation project(':shared-kernel')
+}

@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.iml
+*.swp
+*.swo
+
+# Build artifacts
+build/
+target/
+bin/
+*.jar
+*.war
+*.class
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+**/test/
+**/*_test.go
+**/*Test.java
+
+# Generated code
+**/entity-share/src/main/java/**/jooq/
+**/db/sqlc/
+
+# Node modules (if any)
+node_modules/

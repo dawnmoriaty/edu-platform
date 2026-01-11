@@ -1,0 +1,14 @@
+dependencies {
+    // Spring Security
+    implementation libs.bundles.spring.security
+    
+    // Spring
+    implementation libs.spring.context
+    implementation libs.spring.boot
+    
+    // Security Core
+    implementation project(':security-module:security-core')
+    
+    // Entity Share (for JOOQ records)
+    implementation project(':entity-share')
+}

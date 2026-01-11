@@ -1,0 +1,11 @@
+dependencies {
+    // Spring Security
+    implementation libs.bundles.spring.security
+    
+    // Spring
+    implementation libs.spring.context
+    implementation libs.spring.boot
+    
+    // Shared kernel
+    implementation project(':shared-kernel')
+}

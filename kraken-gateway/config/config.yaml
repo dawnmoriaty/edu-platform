@@ -1,0 +1,11 @@
+server:
+  port: "8000"
+  host: "0.0.0.0"
+
+routes:
+  - path: "/api/v1/social/*"
+    target: "http://localhost:8001"
+    strip_prefix: "/api/v1/social"
+  - path: "/api/v1/crm/*"
+    target: "http://localhost:8080"
+    strip_prefix: "/api/v1/crm"

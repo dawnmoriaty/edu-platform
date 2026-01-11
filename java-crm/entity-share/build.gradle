@@ -1,0 +1,45 @@
+plugins {
+    alias(libs.plugins.jooq)
+}
+
+dependencies {
+    // JOOQ
+    implementation libs.jooq
+    
+    // Database
+    implementation libs.postgresql
+    jooqCodegen libs.postgresql
+}
+
+jooq {
+    configuration {
+        jdbc {
+            driver = 'org.postgresql.Driver'
+            url = project.findProperty('jooq.url') ?: 'jdbc:postgresql://localhost:5432/edu_crm_db'
+            user = project.findProperty('jooq.user') ?: 'root'
+            password = project.findProperty('jooq.password') ?: '123456'
+        }
+        
+        generator {
+            database {
+                name = 'org.jooq.meta.postgres.PostgresDatabase'
+                inputSchema = 'public'
+                excludes = 'flyway_schema_history'
+            }
+            
+            target {
+                packageName = 'com.eduplatform.entity.jooq'
+                directory = "${projectDir}/src/main/java"
+            }
+            
+            generate {
+                pojos = true
+                daos = false
+                interfaces = false
+                records = true
+                immutablePojos = false
+                fluentSetters = true
+            }
+        }
+    }
+}

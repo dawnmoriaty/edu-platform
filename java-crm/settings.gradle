@@ -1,0 +1,22 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'java-crm'
+
+include 'entity-share'
+include 'crm-base'
+include 'shared-kernel'
+include 'security-module:security-core'
+include 'security-module:security-jwt'
+include 'security-module:security-oauth2'
+include 'security-module:security-rbac'
+include 'grpc-service'
+include 'crm-module:crm-domain'
+include 'crm-module:crm-application'
+include 'crm-module:crm-infrastructure'
+include 'crm-module:crm-api'
+include 'app'
