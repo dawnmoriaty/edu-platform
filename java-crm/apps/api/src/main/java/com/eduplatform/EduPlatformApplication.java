@@ -1,5 +1,6 @@
 package com.eduplatform;
 
+import com.eduplatform.common.vertx.server.VertxServerDeployer;
 import com.eduplatform.config.GlobalExceptionHandler;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.Router;
@@ -30,13 +31,13 @@ public class EduPlatformApplication {
             // Register failure handler
             mainRouter.route().failureHandler(exceptionHandler);
 
-            // Start HTTP server
-            vertx.createHttpServer()
-                    .requestHandler(mainRouter)
-                    .listen(port)
-                    .onSuccess(server -> {
-                        log.info("🚀 EduPlatform API Server started on port {}", server.actualPort());
-                        log.info("📚 API Docs: http://localhost:{}/api/docs", server.actualPort());
+            // Deploy HTTP server (set VERTX_INSTANCES=1 for dev, auto for prod)
+            VertxServerDeployer.deploy(vertx, mainRouter, port)
+                    .onSuccess(deploymentId -> {
+                        String instances = System.getenv("VERTX_INSTANCES");
+                        String instanceInfo = instances != null ? instances : "auto";
+                        log.info("🚀 EduPlatform API Server started on port {} (instances: {})", port, instanceInfo);
+                        log.info("📚 API Docs: http://localhost:{}/api/docs", port);
                     })
                     .onFailure(err -> {
                         log.error("❌ Failed to start server", err);

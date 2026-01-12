@@ -13,9 +13,14 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
+      # DEV: max 8, min 2 de khong an het tai nguyen
+      # PROD: tang len 20-30 tuy server
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+      minimum-idle: ${DB_POOL_MIN:2}
+      connection-timeout: 10000
+      idle-timeout: 300000
+      max-lifetime: 600000
+      leak-detection-threshold: 30000
   
   flyway:
     enabled: true
@@ -26,7 +31,22 @@ jwt:
   secret: ${JWT_SECRET:dGhpcyBpcyBhIHZlcnkgc2VjdXJlIGtleSBmb3IgZGV2ZWxvcG1lbnQgb25seQ==}
   expiration: ${JWT_EXPIRATION:86400000}
 
+# Vert.x Configuration
+# DEV defaults: 1 instance, nho de tiet kiem tai nguyen  
+# PROD: set via environment variables
+vertx:
+  # Server instances (DEV=1, PROD=auto detect CPU cores)
+  instances: ${VERTX_INSTANCES:1}
+  
+  # Worker Pool Configuration
+  worker:
+    db-pool-size: ${VERTX_DB_POOL:8}       # Match HikariCP pool
+    io-pool-size: ${VERTX_IO_POOL:4}       # External HTTP calls
+    cpu-pool-size: ${VERTX_CPU_POOL:2}     # Heavy computation
+    max-execute-time: 30                    # Seconds before warning
+
 logging:
   level:
     root: INFO
     com.eduplatform: DEBUG
+    com.zaxxer.hikari: INFO

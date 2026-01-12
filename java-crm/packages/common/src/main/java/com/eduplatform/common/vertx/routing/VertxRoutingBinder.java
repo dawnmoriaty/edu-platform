@@ -1,44 +1,48 @@
 package com.eduplatform.common.vertx.routing;
 
 import com.eduplatform.common.constant.Action;
+import com.eduplatform.common.constant.ErrorCode;
+import com.eduplatform.common.exception.AppException;
 import com.eduplatform.common.response.ApiResponse;
 import com.eduplatform.common.vertx.VertxWrapper;
 import com.eduplatform.common.vertx.annotation.*;
 import com.eduplatform.common.vertx.binder.VertxRouterBinder;
+import com.eduplatform.common.vertx.execution.VertxExecution;
+import com.eduplatform.common.vertx.execution.WorkerPoolManager;
 import com.eduplatform.common.vertx.model.Pageable;
 import com.eduplatform.common.vertx.model.VertxPrincipal;
+import com.eduplatform.common.vertx.security.VertxSecurityConfig;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.handler.BodyHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * VertxRoutingBinder - Tự động scan @VertxRestController và bind routes
  * 
- * Scan tất cả bean có @VertxRestController annotation,
- * tìm các method có @VertxGet, @VertxPost, @VertxPut, @VertxDelete
- * và tự động bind vào Vert.x Router
+ * Features:
+ * - Scan tất cả bean có @VertxRestController annotation
+ * - Cache metadata lúc khởi động (không dùng reflection mỗi request)
+ * - Tự động detect reactive vs blocking return types
+ * - Tự động wrap blocking code vào VertxExecution.blocking()
+ * - Support @RequirePermission với wildcard
  */
 @Slf4j
 @Component
@@ -47,8 +51,17 @@ public class VertxRoutingBinder {
     private final ApplicationContext applicationContext;
     private final ObjectMapper objectMapper;
     
+    // Metadata cache - populated at startup
+    private final Map<String, RouteMetadata> routeCache = new ConcurrentHashMap<>();
+    
     @Value("${app.base-package:com.eduplatform}")
     private String basePackage;
+    
+    @Autowired(required = false)
+    private VertxSecurityConfig securityConfig;
+    
+    @Autowired(required = false)
+    private WorkerPoolManager workerPoolManager;
 
     @Autowired
     public VertxRoutingBinder(ApplicationContext applicationContext,
@@ -73,13 +86,26 @@ public class VertxRoutingBinder {
         // Init VertxWrapper for static access
         VertxWrapper.init(vertx);
         
-        // Add body handler for all routes
-        router.route().handler(BodyHandler.create());
+        // Init WorkerPoolManager nếu có
+        if (workerPoolManager != null) {
+            workerPoolManager.initPools(vertx);
+        }
         
+        // Apply security config (BodyHandler với limits)
+        if (securityConfig != null) {
+            securityConfig.apply(router);
+        } else {
+            // Default security config
+            VertxSecurityConfig.builder()
+                    .bodyLimitMB(10)
+                    .build()
+                    .apply(router);
+        }
+
         // Bind @VertxBeforeHandler beans first (sorted by order)
         bindBeforeHandlers(router);
 
-        // Scan tất cả bean có @VertxRestController
+        // Scan và cache metadata cho tất cả controllers
         Map<String, Object> controllers = applicationContext.getBeansWithAnnotation(VertxRestController.class);
         
         int routeCount = 0;
@@ -87,7 +113,7 @@ public class VertxRoutingBinder {
             routeCount += bindController(router, controller);
         }
         
-        log.info("Bound {} routes from {} controllers", routeCount, controllers.size());
+        log.info("Bound {} routes from {} controllers (metadata cached)", routeCount, controllers.size());
     }
     
     /**
@@ -123,20 +149,21 @@ public class VertxRoutingBinder {
         
         int routeCount = 0;
 
-        // Scan methods
+        // Scan methods và build metadata
         for (Method method : controllerClass.getMethods()) {
-            VertxRequestMapping requestMapping = AnnotatedElementUtils.getMergedAnnotation(method, VertxRequestMapping.class);
+            RouteMetadata metadata = RouteMetadata.from(controller, method, basePath);
             
-            if (requestMapping == null) {
+            if (metadata == null) {
                 continue;
             }
+            
+            // Cache metadata với key = "METHOD:path"
+            String cacheKey = metadata.getHttpMethod() + ":" + metadata.getPath();
+            routeCache.put(cacheKey, metadata);
 
-            String path = basePath + requestMapping.path();
-            HttpMethod httpMethod = requestMapping.method().getVertxMethod();
-
-            router.route(httpMethod, path).handler(ctx -> {
-                handleRequest(ctx, controller, method);
-            });
+            // Bind route với cached metadata
+            router.route(metadata.getHttpMethod(), metadata.getPath())
+                    .handler(ctx -> handleRequest(ctx, metadata));
             
             routeCount++;
         }
@@ -144,47 +171,66 @@ public class VertxRoutingBinder {
         return routeCount;
     }
 
-    private void handleRequest(RoutingContext ctx, Object controller, Method method) {
+    private void handleRequest(RoutingContext ctx, RouteMetadata metadata) {
         try {
-            // Check @RequirePermission if present
-            RequirePermission requirePermission = method.getAnnotation(RequirePermission.class);
-            if (requirePermission != null) {
+            // Check @RequirePermission if present (using cached metadata)
+            if (metadata.hasPermissionRequired()) {
                 VertxPrincipal principal = ctx.get("principal");
                 if (principal == null) {
-                    handleError(ctx, new RuntimeException("Unauthorized: No principal found"));
+                    handleError(ctx, new AppException(ErrorCode.UNAUTHORIZED, "No principal found"));
                     return;
                 }
                 
-                String resource = requirePermission.resource();
-                Action action = requirePermission.action();
-                
-                // Check permission from principal's permissions set
-                String requiredPermission = resource + ":" + action.getCode();
                 Set<String> userPermissions = principal.getPermissions();
                 
-                if (userPermissions == null || !hasPermission(userPermissions, resource, action)) {
-                    handleError(ctx, new RuntimeException("Forbidden: Missing permission " + requiredPermission));
+                if (userPermissions == null || !hasPermission(userPermissions, metadata.getResource(), metadata.getAction())) {
+                    handleError(ctx, new AppException(ErrorCode.PERMISSION_DENIED, 
+                            "Missing permission: " + metadata.getRequiredPermission()));
                     return;
                 }
                 
                 // Store permission info in context for dataScope filtering
-                if (requirePermission.dataScope()) {
+                if (metadata.isRequireDataScope()) {
                     ctx.put("dataScope", true);
-                    ctx.put("dataScopeResource", resource);
+                    ctx.put("dataScopeResource", metadata.getResource());
                 }
             }
             
-            // Extract parameters
-            Object[] args = extractParameters(ctx, method);
+            // Extract parameters using cached metadata
+            Object[] args = extractParameters(ctx, metadata);
             
-            // Invoke method
-            Object result = method.invoke(controller, args);
-            
-            // Handle result
-            handleResult(ctx, result);
+            // Invoke method với auto-blocking detection
+            invokeMethod(ctx, metadata, args);
             
         } catch (Exception e) {
             log.error("Error handling request: {}", e.getMessage(), e);
+            handleError(ctx, e);
+        }
+    }
+    
+    /**
+     * Invoke method với auto-detect blocking/reactive
+     */
+    private void invokeMethod(RoutingContext ctx, RouteMetadata metadata, Object[] args) {
+        try {
+            if (metadata.isReactive()) {
+                // Reactive return type - chạy trực tiếp trên event loop
+                Object result = metadata.getMethod().invoke(metadata.getController(), args);
+                handleResult(ctx, result);
+            } else {
+                // Non-reactive return type - tự động wrap vào blocking
+                VertxExecution.blocking(() -> {
+                    try {
+                        return metadata.getMethod().invoke(metadata.getController(), args);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }).subscribe(
+                        result -> handleResult(ctx, result),
+                        error -> handleError(ctx, error)
+                );
+            }
+        } catch (Exception e) {
             handleError(ctx, e);
         }
     }
@@ -219,106 +265,80 @@ public class VertxRoutingBinder {
         return false;
     }
 
-    private Object[] extractParameters(RoutingContext ctx, Method method) {
-        Parameter[] parameters = method.getParameters();
-        Object[] args = new Object[parameters.length];
+    /**
+     * Extract parameters using cached metadata (không dùng reflection mỗi request)
+     */
+    private Object[] extractParameters(RoutingContext ctx, RouteMetadata metadata) {
+        List<ParameterMetadata> params = metadata.getParameters();
+        Object[] args = new Object[params.size()];
 
-        for (int i = 0; i < parameters.length; i++) {
-            args[i] = extractParameter(ctx, parameters[i]);
+        for (int i = 0; i < params.size(); i++) {
+            args[i] = extractParameter(ctx, params.get(i));
         }
 
         return args;
     }
 
-    private Object extractParameter(RoutingContext ctx, Parameter parameter) {
-        Class<?> type = parameter.getType();
-
-        // RoutingContext
-        if (type == RoutingContext.class) {
-            return ctx;
-        }
-
-        // VertxPrincipal - từ context (đã được set bởi auth interceptor)
-        if (type == VertxPrincipal.class) {
-            return ctx.get("principal");
-        }
-
-        // Pageable
-        if (type == Pageable.class) {
-            Pageable pageable = new Pageable();
-            String page = ctx.request().getParam("page");
-            String size = ctx.request().getParam("size");
-            String sort = ctx.request().getParam("sort");
-            String order = ctx.request().getParam("order");
+    private Object extractParameter(RoutingContext ctx, ParameterMetadata param) {
+        return switch (param.getParameterType()) {
+            case ROUTING_CONTEXT -> ctx;
             
-            if (page != null) pageable.setPage(Integer.parseInt(page));
-            if (size != null) pageable.setSize(Integer.parseInt(size));
-            if (sort != null) pageable.setSort(sort);
-            if (order != null) pageable.setOrder(order);
+            case PRINCIPAL -> ctx.get("principal");
             
-            return pageable;
-        }
-
-        // @VertxRequestBody
-        VertxRequestBody requestBody = parameter.getAnnotation(VertxRequestBody.class);
-        if (requestBody != null) {
-            try {
-                JsonObject body = ctx.body().asJsonObject();
-                if (body == null && requestBody.required()) {
-                    throw new IllegalArgumentException("Request body is required");
+            case PAGEABLE -> {
+                Pageable pageable = new Pageable();
+                String page = ctx.request().getParam("page");
+                String size = ctx.request().getParam("size");
+                String sort = ctx.request().getParam("sort");
+                String order = ctx.request().getParam("order");
+                
+                if (page != null) pageable.setPage(Integer.parseInt(page));
+                if (size != null) pageable.setSize(Integer.parseInt(size));
+                if (sort != null) pageable.setSort(sort);
+                if (order != null) pageable.setOrder(order);
+                
+                yield pageable;
+            }
+            
+            case REQUEST_BODY -> {
+                try {
+                    JsonObject body = ctx.body().asJsonObject();
+                    if (body == null && param.isBodyRequired()) {
+                        throw new AppException(ErrorCode.BAD_REQUEST, "Request body is required");
+                    }
+                    if (body == null) {
+                        yield null;
+                    }
+                    yield objectMapper.readValue(body.encode(), param.getType());
+                } catch (AppException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new AppException(ErrorCode.BAD_REQUEST, "Failed to parse request body: " + e.getMessage());
                 }
-                if (body == null) {
-                    return null;
+            }
+            
+            case REQUEST_PARAM -> {
+                String value = ctx.request().getParam(param.getParamName());
+                if (value == null || value.isEmpty()) {
+                    value = param.getDefaultValue();
                 }
-                return objectMapper.readValue(body.encode(), type);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to parse request body", e);
+                if ((value == null || value.isEmpty()) && param.isParamRequired()) {
+                    throw new AppException(ErrorCode.BAD_REQUEST, 
+                            "Request param " + param.getParamName() + " is required");
+                }
+                yield ParameterMetadata.convertValue(value, param.getType());
             }
-        }
-
-        // @VertxRequestParam
-        VertxRequestParam requestParam = parameter.getAnnotation(VertxRequestParam.class);
-        if (requestParam != null) {
-            String value = ctx.request().getParam(requestParam.value());
-            if (value == null || value.isEmpty()) {
-                value = requestParam.defaultValue();
+            
+            case PATH_VARIABLE -> {
+                String value = ctx.pathParam(param.getPathVarName());
+                yield ParameterMetadata.convertValue(value, param.getType());
             }
-            if ((value == null || value.isEmpty()) && requestParam.required()) {
-                throw new IllegalArgumentException("Request param " + requestParam.value() + " is required");
+            
+            case QUERY_PARAM -> {
+                String value = ctx.request().getParam(param.getParamName());
+                yield ParameterMetadata.convertValue(value, param.getType());
             }
-            return convertValue(value, type);
-        }
-
-        // @VertxPathVariable
-        VertxPathVariable pathVariable = parameter.getAnnotation(VertxPathVariable.class);
-        if (pathVariable != null) {
-            String value = ctx.pathParam(pathVariable.value());
-            return convertValue(value, type);
-        }
-
-        // Default: try to get from query params based on parameter name
-        String paramName = parameter.getName();
-        String value = ctx.request().getParam(paramName);
-        if (value != null) {
-            return convertValue(value, type);
-        }
-
-        return null;
-    }
-
-    private Object convertValue(String value, Class<?> type) {
-        if (value == null || value.isEmpty()) {
-            return null;
-        }
-
-        if (type == String.class) return value;
-        if (type == Integer.class || type == int.class) return Integer.parseInt(value);
-        if (type == Long.class || type == long.class) return Long.parseLong(value);
-        if (type == Boolean.class || type == boolean.class) return Boolean.parseBoolean(value);
-        if (type == UUID.class) return UUID.fromString(value);
-        if (type == Double.class || type == double.class) return Double.parseDouble(value);
-
-        return value;
+        };
     }
 
     @SuppressWarnings("unchecked")
@@ -330,18 +350,36 @@ public class VertxRoutingBinder {
             return;
         }
 
-        // Single<ResponseEntity<...>> - RxJava reactive
-        if (result instanceof Single) {
-            ((Single<?>) result).subscribe(
+        // Single<...> - RxJava reactive
+        if (result instanceof Single<?> single) {
+            single.subscribe(
                     res -> handleResult(ctx, res),
+                    error -> handleError(ctx, (Throwable) error)
+            );
+            return;
+        }
+        
+        // Maybe<...> - RxJava reactive (nullable)
+        if (result instanceof Maybe<?> maybe) {
+            maybe.subscribe(
+                    res -> handleResult(ctx, res),
+                    error -> handleError(ctx, (Throwable) error),
+                    () -> ctx.response().setStatusCode(204).end()  // Empty = 204
+            );
+            return;
+        }
+        
+        // Completable - RxJava reactive (void)
+        if (result instanceof Completable completable) {
+            completable.subscribe(
+                    () -> ctx.response().setStatusCode(204).end(),
                     error -> handleError(ctx, (Throwable) error)
             );
             return;
         }
 
         // ResponseEntity
-        if (result instanceof ResponseEntity) {
-            ResponseEntity<?> responseEntity = (ResponseEntity<?>) result;
+        if (result instanceof ResponseEntity<?> responseEntity) {
             Object body = responseEntity.getBody();
             
             ctx.response()
@@ -373,21 +411,40 @@ public class VertxRoutingBinder {
     }
 
     private void handleError(RoutingContext ctx, Throwable error) {
-        log.error("Request error: {}", error.getMessage());
+        // Unwrap InvocationTargetException
+        Throwable cause = error;
+        while (cause.getCause() != null && 
+               cause instanceof java.lang.reflect.InvocationTargetException) {
+            cause = cause.getCause();
+        }
+        
+        log.error("Request error: {}", cause.getMessage());
 
-        int statusCode = 500;
-        String message = error.getMessage();
+        int statusCode;
+        int errorCode;
+        String message = cause.getMessage();
 
-        // Extract status code from exception if possible
-        if (error.getMessage() != null && error.getMessage().contains("Unauthorized")) {
-            statusCode = 401;
-        } else if (error.getMessage() != null && error.getMessage().contains("Forbidden")) {
+        // Extract info using instanceof (không dùng string matching)
+        if (cause instanceof AppException appEx) {
+            statusCode = appEx.getHttpStatus();
+            errorCode = appEx.getCode();
+            message = appEx.getErrorMessage();
+        } else if (cause instanceof IllegalArgumentException) {
+            statusCode = 400;
+            errorCode = ErrorCode.BAD_REQUEST.getCode();
+        } else if (cause instanceof SecurityException) {
             statusCode = 403;
-        } else if (error.getMessage() != null && error.getMessage().contains("not found")) {
-            statusCode = 404;
+            errorCode = ErrorCode.FORBIDDEN.getCode();
+        } else if (cause instanceof NullPointerException) {
+            statusCode = 500;
+            errorCode = ErrorCode.INTERNAL_ERROR.getCode();
+            message = "Internal error: null reference";
+        } else {
+            statusCode = 500;
+            errorCode = ErrorCode.INTERNAL_ERROR.getCode();
         }
 
-        ApiResponse<?> response = ApiResponse.error(statusCode, message);
+        ApiResponse<?> response = ApiResponse.error(errorCode, message);
         
         try {
             ctx.response()
@@ -398,7 +455,7 @@ public class VertxRoutingBinder {
             ctx.response()
                     .setStatusCode(500)
                     .putHeader("Content-Type", "application/json")
-                    .end("{\"code\":500,\"message\":\"Internal Server Error\"}");
+                    .end("{\"code\":5001,\"message\":\"Internal Server Error\"}");
         }
     }
 }
