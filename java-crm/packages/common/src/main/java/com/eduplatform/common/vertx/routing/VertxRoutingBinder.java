@@ -1,7 +1,10 @@
 package com.eduplatform.common.vertx.routing;
 
+import com.eduplatform.common.constant.Action;
 import com.eduplatform.common.response.ApiResponse;
+import com.eduplatform.common.vertx.VertxWrapper;
 import com.eduplatform.common.vertx.annotation.*;
+import com.eduplatform.common.vertx.binder.VertxRouterBinder;
 import com.eduplatform.common.vertx.model.Pageable;
 import com.eduplatform.common.vertx.model.VertxPrincipal;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -24,7 +27,10 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -64,27 +70,58 @@ public class VertxRoutingBinder {
      * Bind tất cả @VertxRestController vào router
      */
     public void bind(Router router, Vertx vertx) {
+        // Init VertxWrapper for static access
+        VertxWrapper.init(vertx);
+        
         // Add body handler for all routes
         router.route().handler(BodyHandler.create());
+        
+        // Bind @VertxBeforeHandler beans first (sorted by order)
+        bindBeforeHandlers(router);
 
         // Scan tất cả bean có @VertxRestController
         Map<String, Object> controllers = applicationContext.getBeansWithAnnotation(VertxRestController.class);
         
-        log.info("Found {} VertxRestController beans", controllers.size());
-        
+        int routeCount = 0;
         for (Object controller : controllers.values()) {
-            bindController(router, controller);
+            routeCount += bindController(router, controller);
         }
+        
+        log.info("Bound {} routes from {} controllers", routeCount, controllers.size());
+    }
+    
+    /**
+     * Bind all @VertxBeforeHandler beans (sorted by order)
+     */
+    private void bindBeforeHandlers(Router router) {
+        Map<String, Object> handlers = applicationContext.getBeansWithAnnotation(VertxBeforeHandler.class);
+        
+        if (handlers.isEmpty()) return;
+        
+        // Sort by order annotation
+        List<Object> sortedHandlers = handlers.values().stream()
+                .filter(h -> h instanceof VertxRouterBinder)
+                .sorted(Comparator.comparingInt(h -> {
+                    VertxBeforeHandler ann = h.getClass().getAnnotation(VertxBeforeHandler.class);
+                    return ann != null ? ann.order() : 100;
+                }))
+                .toList();
+        
+        for (Object handler : sortedHandlers) {
+            ((VertxRouterBinder) handler).bind(router);
+        }
+        
+        log.info("Bound {} before handlers", sortedHandlers.size());
     }
 
-    private void bindController(Router router, Object controller) {
+    private int bindController(Router router, Object controller) {
         Class<?> controllerClass = controller.getClass();
         
         // Get base path from @VertxRestController
         VertxRestController annotation = controllerClass.getAnnotation(VertxRestController.class);
         String basePath = annotation != null ? annotation.value() : "";
         
-        log.info("Binding controller: {} with basePath: {}", controllerClass.getSimpleName(), basePath);
+        int routeCount = 0;
 
         // Scan methods
         for (Method method : controllerClass.getMethods()) {
@@ -96,17 +133,47 @@ public class VertxRoutingBinder {
 
             String path = basePath + requestMapping.path();
             HttpMethod httpMethod = requestMapping.method().getVertxMethod();
-            
-            log.info("  {} {} -> {}", httpMethod, path, method.getName());
 
             router.route(httpMethod, path).handler(ctx -> {
                 handleRequest(ctx, controller, method);
             });
+            
+            routeCount++;
         }
+        
+        return routeCount;
     }
 
     private void handleRequest(RoutingContext ctx, Object controller, Method method) {
         try {
+            // Check @RequirePermission if present
+            RequirePermission requirePermission = method.getAnnotation(RequirePermission.class);
+            if (requirePermission != null) {
+                VertxPrincipal principal = ctx.get("principal");
+                if (principal == null) {
+                    handleError(ctx, new RuntimeException("Unauthorized: No principal found"));
+                    return;
+                }
+                
+                String resource = requirePermission.resource();
+                Action action = requirePermission.action();
+                
+                // Check permission from principal's permissions set
+                String requiredPermission = resource + ":" + action.getCode();
+                Set<String> userPermissions = principal.getPermissions();
+                
+                if (userPermissions == null || !hasPermission(userPermissions, resource, action)) {
+                    handleError(ctx, new RuntimeException("Forbidden: Missing permission " + requiredPermission));
+                    return;
+                }
+                
+                // Store permission info in context for dataScope filtering
+                if (requirePermission.dataScope()) {
+                    ctx.put("dataScope", true);
+                    ctx.put("dataScopeResource", resource);
+                }
+            }
+            
             // Extract parameters
             Object[] args = extractParameters(ctx, method);
             
@@ -120,6 +187,36 @@ public class VertxRoutingBinder {
             log.error("Error handling request: {}", e.getMessage(), e);
             handleError(ctx, e);
         }
+    }
+    
+    /**
+     * Check if user has the required permission
+     * Supports wildcard permissions like "CONTACT:*" or "*:VIEW"
+     */
+    private boolean hasPermission(Set<String> userPermissions, String resource, Action action) {
+        String requiredPermission = resource + ":" + action.getCode();
+        
+        // Direct match
+        if (userPermissions.contains(requiredPermission)) {
+            return true;
+        }
+        
+        // Wildcard on action: "CONTACT:*"
+        if (userPermissions.contains(resource + ":*")) {
+            return true;
+        }
+        
+        // Wildcard on resource: "*:VIEW"
+        if (userPermissions.contains("*:" + action.getCode())) {
+            return true;
+        }
+        
+        // Super admin wildcard: "*:*"
+        if (userPermissions.contains("*:*")) {
+            return true;
+        }
+        
+        return false;
     }
 
     private Object[] extractParameters(RoutingContext ctx, Method method) {

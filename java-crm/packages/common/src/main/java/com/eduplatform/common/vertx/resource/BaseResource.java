@@ -1,5 +1,6 @@
 package com.eduplatform.common.vertx.resource;
 
+import com.eduplatform.common.constant.Action;
 import com.eduplatform.common.constant.ErrorCode;
 import com.eduplatform.common.exception.AppException;
 import com.eduplatform.common.response.ApiResponse;
@@ -19,24 +20,26 @@ import org.springframework.http.ResponseEntity;
  * BaseResource - Base class cho tất cả @VertxRestController
  * 
  * Cung cấp:
- * - checkPermission() - kiểm tra quyền
- * - sendSuccess() / sendError() - response helpers
+ * - getAuthenticatedUser() - lấy user đã xác thực (dùng với @RequirePermission)
+ * - checkPermission() - kiểm tra quyền thủ công (optional)
+ * - okEntity() - response helpers
  * - getCustomError() - error response
  * 
- * Usage:
+ * Usage với @RequirePermission (recommended):
  * <pre>
  * @VertxRestController
  * public class ContactResource extends BaseResource {
- *     private static final String URI = "/contact/";
  *     
- *     @VertxGet("/api/v1/contact/list")
- *     public Single<ResponseEntity<DfResponse<List<Contact>>>> list(
+ *     @VertxGet("/api/v1/contacts")
+ *     @RequirePermission(resource = "CONTACT", action = Action.VIEW)
+ *     public Single<ResponseEntity<ApiResponse<List<Contact>>>> list(
  *             VertxPrincipal principal,
  *             Pageable pageable
  *     ) {
- *         return checkPermission(principal, URI, "VIEW")
- *             .flatMap(user -> contactService.list(user.getBsnId(), pageable))
- *             .map(DfResponse::okEntity);
+ *         // Permission đã được check bởi interceptor
+ *         return getAuthenticatedUser(principal)
+ *             .flatMap(user -> contactService.list(user.getId(), pageable))
+ *             .map(this::okEntity);
  *     }
  * }
  * </pre>
@@ -60,17 +63,78 @@ public abstract class BaseResource {
     // ============================================
     // Permission Check Methods
     // ============================================
+    
+    /**
+     * Get authenticated user from principal - use with @RequirePermission
+     * Permission đã được check bởi VertxRoutingBinder interceptor
+     * 
+     * @return Single<T> - the security user object (typically Employee, User, etc.)
+     */
+    @SuppressWarnings("unchecked")
+    protected <T> Single<T> getAuthenticatedUser(VertxPrincipal principal) {
+        if (principal == null || principal.getUserId() == null) {
+            return Single.error(new AppException(ErrorCode.UNAUTHORIZED, "Chưa đăng nhập"));
+        }
+        
+        T user = (T) principal.getSecurityUser();
+        if (user == null) {
+            return Single.error(new AppException(ErrorCode.UNAUTHORIZED, "User not found in context"));
+        }
+        
+        return Single.just(user);
+    }
+    
+    /**
+     * Check if principal is authenticated (without getting user object)
+     */
+    protected Single<VertxPrincipal> requireAuthenticated(VertxPrincipal principal) {
+        if (principal == null || principal.getUserId() == null) {
+            return Single.error(new AppException(ErrorCode.UNAUTHORIZED, "Chưa đăng nhập"));
+        }
+        return Single.just(principal);
+    }
 
     /**
-     * Check permission - Override trong subclass nếu cần
-     * Default implementation: chỉ check xem có principal không
+     * Manual permission check - dùng khi không dùng @RequirePermission
+     * @deprecated Use @RequirePermission annotation instead
      */
+    @Deprecated
     protected <T> Single<T> checkPermission(VertxPrincipal principal, String uri, String action) {
         if (principal == null || principal.getUserId() == null) {
             return Single.error(new AppException(ErrorCode.UNAUTHORIZED, "Chưa đăng nhập"));
         }
         
-        // Subclass có thể override để check permission thực sự
+        // Check permission from principal
+        String resource = uriToResource(uri);
+        String requiredPermission = resource.toUpperCase() + ":" + action;
+        
+        if (!principal.hasPermission(requiredPermission)) {
+            return Single.error(new AppException(ErrorCode.FORBIDDEN, "Missing permission: " + requiredPermission));
+        }
+        
+        @SuppressWarnings("unchecked")
+        T user = (T) principal.getSecurityUser();
+        if (user == null) {
+            return Single.error(new AppException(ErrorCode.UNAUTHORIZED, "User not found"));
+        }
+        
+        return Single.just(user);
+    }
+    
+    /**
+     * Check permission với Action enum
+     */
+    protected <T> Single<T> checkPermission(VertxPrincipal principal, String resource, Action action) {
+        if (principal == null || principal.getUserId() == null) {
+            return Single.error(new AppException(ErrorCode.UNAUTHORIZED, "Chưa đăng nhập"));
+        }
+        
+        String requiredPermission = resource + ":" + action.getCode();
+        
+        if (!principal.hasPermission(requiredPermission)) {
+            return Single.error(new AppException(ErrorCode.FORBIDDEN, "Missing permission: " + requiredPermission));
+        }
+        
         @SuppressWarnings("unchecked")
         T user = (T) principal.getSecurityUser();
         if (user == null) {

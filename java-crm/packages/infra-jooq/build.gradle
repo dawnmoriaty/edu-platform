@@ -5,6 +5,15 @@ plugins {
 
 group = 'com.eduplatform.packages.infra.jooq'
 
+// Add generated source to sourceSets
+sourceSets {
+    main {
+        java {
+            srcDir "${project.projectDir}/build/generated-src/jooq/main"
+        }
+    }
+}
+
 dependencies {
     implementation project(':packages:common')
     
@@ -34,7 +43,7 @@ jooq {
             generateSchemaSourceOnCompilation = false  // Manual generation
 
             generationTool {
-                logging = org.jooq.meta.jaxb.Logging.WARN
+                logging = org.jooq.meta.jaxb.Logging.INFO
                 
                 jdbc {
                     driver = 'org.postgresql.Driver'
@@ -55,20 +64,6 @@ jooq {
                         
                         // Exclude Flyway tables
                         excludes = 'flyway_.*'
-                        
-                        // Force types
-                        forcedTypes {
-                            forcedType {
-                                name = 'varchar'
-                                includeExpression = '.*'
-                                includeTypes = 'JSONB?'
-                            }
-                            forcedType {
-                                userType = 'java.time.LocalDateTime'
-                                includeExpression = '.*_at'
-                                includeTypes = 'TIMESTAMP.*'
-                            }
-                        }
                     }
 
                     generate {
@@ -77,18 +72,18 @@ jooq {
                         immutablePojos = false
                         fluentSetters = true
                         javaTimeTypes = true
-                        springAnnotations = true
-                        springDao = true
+                        springAnnotations = false  // Không cần, đã viết repo thủ công
+                        springDao = false          // Không dùng generated DAO
                         pojos = true
                         pojosEqualsAndHashCode = true
                         pojosToString = true
-                        daos = true
-                        routines = true
+                        daos = false               // Không dùng generated DAO  
+                        routines = false
                     }
 
                     target {
                         packageName = 'com.eduplatform.jooq.generated'
-                        directory = 'src/main/java'
+                        directory = "${project.projectDir}/build/generated-src/jooq/main"
                     }
 
                     strategy {
