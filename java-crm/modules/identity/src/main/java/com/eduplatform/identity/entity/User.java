@@ -9,6 +9,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * User entity - Tài khoản người dùng
@@ -22,13 +23,15 @@ import java.util.List;
 public class User extends BaseEntity {
     private String username;
     private String email;
-    private String password;
-    private String name;
+    private String passwordHash;
+    private String firstName;
+    private String lastName;
+    private String phone;
     private String avatar;
     private UserStatus status;
     
     // Roles (Many-to-Many)
-    private List<Integer> roleIds;
+    private List<UUID> roleIds;
     private List<Role> roles;
 
     public boolean isActive() {
@@ -38,5 +41,11 @@ public class User extends BaseEntity {
     public List<String> getRoleCodes() {
         if (roles == null) return List.of();
         return roles.stream().map(Role::getCode).toList();
+    }
+    
+    public String getFullName() {
+        if (firstName == null && lastName == null) return username;
+        return (firstName != null ? firstName : "") + 
+               (lastName != null ? " " + lastName : "");
     }
 }

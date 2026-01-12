@@ -1,34 +1,35 @@
 package com.eduplatform.auth.rbac.service;
 
 import com.eduplatform.auth.rbac.model.SecurityUser;
-import io.reactivex.rxjava3.core.Single;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * PermissionService interface - Check permission với RxJava3
+ * PermissionService interface - Check permission
+ * Synchronous style, không dùng RxJava
  */
 public interface PermissionService {
 
     /**
      * Check permission - throw exception nếu không có quyền
      */
-    Single<SecurityUser> checkPermission(Integer userId, String resource, String action);
+    SecurityUser checkPermission(UUID userId, String resource, String action);
 
     /**
      * Check permission - return boolean
      */
-    Single<Boolean> hasPermission(Integer userId, String resource, String action);
+    boolean hasPermission(UUID userId, String resource, String action);
 
     /**
      * Get all permissions của user
      * @return Map<ResourceCode, List<ActionCode>>
      */
-    Single<Map<String, List<String>>> getUserPermissions(Integer userId);
+    Map<String, List<String>> getUserPermissions(UUID userId);
 
     /**
      * Invalidate cache khi permission thay đổi
      */
-    void invalidateUserPermissions(Integer userId);
+    void invalidateUserPermissions(UUID userId);
 }

@@ -5,6 +5,7 @@ import com.eduplatform.auth.rbac.model.VertxPrincipal;
 import io.vertx.ext.web.RoutingContext;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * SecurityUtils - Helper methods cho security với Vert.x 5
@@ -12,6 +13,7 @@ import java.util.Optional;
  * - Dùng Optional thay vì null check
  * - Thêm type-safe helper methods
  * - Support context data keys as constants
+ * - Uses UUID for user IDs
  */
 public final class SecurityUtils {
 
@@ -25,14 +27,14 @@ public final class SecurityUtils {
     /**
      * Lấy userId từ principal
      */
-    public static Integer userId(VertxPrincipal principal) {
+    public static UUID userId(VertxPrincipal principal) {
         return principal != null ? principal.getUserId() : null;
     }
 
     /**
      * Lấy userId từ context (shortcut)
      */
-    public static Optional<Integer> getUserId(RoutingContext context) {
+    public static Optional<UUID> getUserId(RoutingContext context) {
         return getPrincipalOpt(context).map(VertxPrincipal::getUserId);
     }
 

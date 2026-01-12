@@ -9,6 +9,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * RbacPermission entity - Quyền hạn: Role - Resource - Actions
@@ -19,16 +20,17 @@ import java.util.List;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class RbacPermission extends BaseEntity {
-    private Integer roleId;
-    private Integer resourceId;
+    private UUID roleId;
+    private UUID permissionId;
     
-    // Actions: ["VIEW", "ADD", "UPDATE", "DELETE"]
+    // Permission details
+    private String resource;
+    private String action;
+    private String description;
+    
+    // Actions list (for grouped view)
     private List<String> actions;
     
     // Data scope: 1=All, 2=Department, 3=Own
     private DataScope dataScope;
-    
-    // Joined fields
-    private String resourceCode;
-    private String resourceName;
 }

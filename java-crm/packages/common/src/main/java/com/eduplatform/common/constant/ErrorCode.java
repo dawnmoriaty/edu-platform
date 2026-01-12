@@ -40,6 +40,7 @@ public enum ErrorCode {
     DUPLICATE_USERNAME(4011, "Username already exists", 409),
     
     // Server errors
+    INTERNAL_ERROR(5001, "Internal server error", 500),
     INTERNAL_SERVER_ERROR(5001, "Internal server error", 500),
     DATABASE_ERROR(5002, "Database error", 500),
     SERVICE_UNAVAILABLE(5003, "Service unavailable", 503);

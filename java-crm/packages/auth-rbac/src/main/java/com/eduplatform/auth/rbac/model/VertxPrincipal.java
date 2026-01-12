@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.security.Principal;
+import java.util.UUID;
 
 /**
  * VertxPrincipal - Principal cho Vert.x context
@@ -15,7 +16,7 @@ import java.security.Principal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class VertxPrincipal implements Principal {
-    private Integer userId;
+    private UUID userId;
     private String username;
     private String token;
     private SecurityUser securityUser;

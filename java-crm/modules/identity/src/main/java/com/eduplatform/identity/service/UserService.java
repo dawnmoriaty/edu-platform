@@ -1,19 +1,45 @@
 package com.eduplatform.identity.service;
 
-import com.eduplatform.common.paging.Page;
-import com.eduplatform.common.paging.Pageable;
-import com.eduplatform.identity.dto.response.UserResponse;
+import com.eduplatform.auth.rbac.model.SecurityUser;
 import com.eduplatform.identity.entity.User;
+import io.vertx.core.json.JsonObject;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.UUID;
 
+/**
+ * UserService - Service cho User operations
+ * Synchronous style, không dùng RxJava
+ */
 public interface UserService {
-    Optional<User> findById(Integer id);
-    Optional<User> findByUsername(String username);
-    Optional<User> findByEmail(String email);
-    Optional<User> findByUsernameOrEmail(String identity);
-    Page<UserResponse> findAll(Pageable pageable);
-    User create(User user);
-    User update(Integer id, User user);
-    void delete(Integer id);
+
+    /**
+     * Lấy danh sách users với pagination
+     */
+    List<User> getUsers(String query, String status, int page, int size);
+
+    /**
+     * Đếm tổng users
+     */
+    long countUsers(String query, String status);
+
+    /**
+     * Lấy user theo ID
+     */
+    User getUserById(UUID id);
+
+    /**
+     * Tạo user mới
+     */
+    User createUser(JsonObject data, SecurityUser currentUser);
+
+    /**
+     * Cập nhật user
+     */
+    User updateUser(UUID id, JsonObject data, SecurityUser currentUser);
+
+    /**
+     * Xóa user
+     */
+    boolean deleteUser(UUID id, SecurityUser currentUser);
 }

@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'nu.studer.jooq' version '10.1.1'
 }
 
 group = 'com.eduplatform.packages.infra.jooq'
@@ -16,4 +17,95 @@ dependencies {
     
     implementation 'org.springframework:spring-context'
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    
+    // jOOQ Code Generation
+    jooqGenerator libs.postgresql
+    jooqGenerator libs.jooq.meta
+    jooqGenerator libs.jooq.codegen
+}
+
+// jOOQ Code Generation Configuration
+jooq {
+    version = '3.19.29'
+    edition = nu.studer.gradle.jooq.JooqEdition.OSS
+
+    configurations {
+        main {
+            generateSchemaSourceOnCompilation = false  // Manual generation
+
+            generationTool {
+                logging = org.jooq.meta.jaxb.Logging.WARN
+                
+                jdbc {
+                    driver = 'org.postgresql.Driver'
+                    url = 'jdbc:postgresql://localhost:5432/edu_crm_db'
+                    user = 'root'
+                    password = '123456'
+                }
+
+                generator {
+                    name = 'org.jooq.codegen.JavaGenerator'
+
+                    database {
+                        name = 'org.jooq.meta.postgres.PostgresDatabase'
+                        inputSchema = 'public'
+                        
+                        // Include all tables
+                        includes = '.*'
+                        
+                        // Exclude Flyway tables
+                        excludes = 'flyway_.*'
+                        
+                        // Force types
+                        forcedTypes {
+                            forcedType {
+                                name = 'varchar'
+                                includeExpression = '.*'
+                                includeTypes = 'JSONB?'
+                            }
+                            forcedType {
+                                userType = 'java.time.LocalDateTime'
+                                includeExpression = '.*_at'
+                                includeTypes = 'TIMESTAMP.*'
+                            }
+                        }
+                    }
+
+                    generate {
+                        deprecated = false
+                        records = true
+                        immutablePojos = false
+                        fluentSetters = true
+                        javaTimeTypes = true
+                        springAnnotations = true
+                        springDao = true
+                        pojos = true
+                        pojosEqualsAndHashCode = true
+                        pojosToString = true
+                        daos = true
+                        routines = true
+                    }
+
+                    target {
+                        packageName = 'com.eduplatform.jooq.generated'
+                        directory = 'src/main/java'
+                    }
+
+                    strategy {
+                        name = 'org.jooq.codegen.DefaultGeneratorStrategy'
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Task to generate jOOQ code
+tasks.named('generateJooq').configure {
+    doFirst {
+        println "Generating jOOQ code from database..."
+    }
+    doLast {
+        println "jOOQ code generation completed!"
+    }
 }

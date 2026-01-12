@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * SecurityUser - Thông tin user đã xác thực (Spring Boot 4 + Vert.x 5)
@@ -19,6 +20,7 @@ import java.util.Set;
  * - Implements Serializable cho Redis cache
  * - Thêm helper methods cho permission check
  * - Support wildcard permissions
+ * - Uses UUID for IDs
  */
 @Data
 @Builder
@@ -27,16 +29,16 @@ import java.util.Set;
 public class SecurityUser implements Serializable {
     
     @Serial
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
     
-    private Integer id;
+    private UUID id;
     private String username;
     private String email;
     private String name;
     private String avatar;
     
     // Role info
-    private List<Integer> roleIds;
+    private List<UUID> roleIds;
     private List<String> roleCodes;
     
     // Permission matrix: resource -> actions
@@ -44,8 +46,8 @@ public class SecurityUser implements Serializable {
     
     // Data scope
     private DataScope dataScope;
-    private Integer departmentId;
-    private List<Integer> subordinateIds;
+    private UUID departmentId;
+    private List<UUID> subordinateIds;
 
     /**
      * Check xem user có permission không (support wildcard)
@@ -139,7 +141,7 @@ public class SecurityUser implements Serializable {
     /**
      * Check if user can access specific department's data
      */
-    public boolean canAccessDepartment(Integer targetDepartmentId) {
+    public boolean canAccessDepartment(UUID targetDepartmentId) {
         if (isSuperAdmin() || dataScope == DataScope.ALL) {
             return true;
         }
@@ -152,7 +154,7 @@ public class SecurityUser implements Serializable {
     /**
      * Check if user can access specific user's data
      */
-    public boolean canAccessUser(Integer targetUserId) {
+    public boolean canAccessUser(UUID targetUserId) {
         if (isSuperAdmin() || dataScope == DataScope.ALL) {
             return true;
         }

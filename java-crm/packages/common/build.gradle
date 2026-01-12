@@ -9,8 +9,9 @@ dependencies {
     api libs.bundles.vertx
     api libs.rxjava
     
-    // Spring Context
+    // Spring Context & Web
     implementation 'org.springframework:spring-context'
+    implementation 'org.springframework:spring-web'
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
     
     // JSON
@@ -18,6 +19,13 @@ dependencies {
     
     // Utilities
     api libs.commons.lang3
+    
+    // Lombok
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
     
     compileOnly libs.jakarta.servlet
 }

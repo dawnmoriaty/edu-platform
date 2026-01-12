@@ -71,7 +71,9 @@ public class PermissionInterceptor implements Handler<RoutingContext> {
         
         Single<SecurityUser> userSingle = cachedUser != null
                 ? Single.just(cachedUser)
-                : permissionService.checkPermission(principal.getUserId(), resource, action);
+                : Single.fromCallable(() -> 
+                        permissionService.checkPermission(principal.getUserId(), resource, action))
+                        .subscribeOn(io.reactivex.rxjava3.schedulers.Schedulers.io());
 
         userSingle
                 .flatMap(securityUser -> {

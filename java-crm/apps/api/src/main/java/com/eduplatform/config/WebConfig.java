@@ -1,14 +1,13 @@
 package com.eduplatform.config;
 
 import com.eduplatform.auth.rbac.handler.JwtAuthHandler;
-import com.eduplatform.auth.rbac.handler.PermissionInterceptor;
-import com.eduplatform.identity.handler.AuthHandler;
-import com.eduplatform.identity.handler.UserHandler;
+import com.eduplatform.common.vertx.routing.VertxRoutingBinder;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CorsHandler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,15 +16,17 @@ import java.util.Set;
 
 /**
  * WebConfig - Vert.x Router Configuration
+ * 
+ * Sử dụng VertxRoutingBinder để auto-scan @VertxRestController
+ * Không cần khai báo routes thủ công
  */
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class WebConfig {
 
     private final JwtAuthHandler jwtAuthHandler;
-    private final PermissionInterceptor permissionInterceptor;
-    private final AuthHandler authHandler;
-    private final UserHandler userHandler;
+    private final VertxRoutingBinder vertxRoutingBinder;
 
     @Bean
     public Vertx vertx() {
@@ -54,22 +55,25 @@ public class WebConfig {
                 .allowedMethod(io.vertx.core.http.HttpMethod.DELETE)
                 .allowedMethod(io.vertx.core.http.HttpMethod.OPTIONS));
 
-        // Public routes (no auth required)
-        router.post("/api/v1/auth/login").handler(authHandler.login());
-        router.post("/api/v1/auth/register").handler(authHandler.register());
+        // JWT Auth handler cho protected routes
+        // Skip auth cho public routes
+        router.route("/api/*").handler(ctx -> {
+            String path = ctx.request().path();
+            
+            // Public routes - skip auth
+            if (path.equals("/api/v1/auth/login") || 
+                path.equals("/api/v1/auth/register")) {
+                ctx.next();
+                return;
+            }
+            
+            // Protected routes - require auth
+            jwtAuthHandler.handle(ctx);
+        });
 
-        // Protected routes
-        router.route("/api/*").handler(jwtAuthHandler);
-        router.route("/api/*").handler(permissionInterceptor);
-
-        // Auth routes
-        router.get("/api/v1/auth/me").handler(authHandler.getCurrentUser());
-        router.post("/api/v1/auth/refresh").handler(authHandler.refreshToken());
-
-        // User routes
-        router.get("/api/v1/users/me").handler(userHandler.getCurrentUser());
-        router.get("/api/v1/users").handler(userHandler.getUsers());
-        router.get("/api/v1/users/:id").handler(userHandler.getUserById());
+        // Auto-bind @VertxRestController routes
+        log.info("Binding VertxRestController routes...");
+        vertxRoutingBinder.bind(router, vertx);
 
         // Health check
         router.get("/health").handler(ctx ->

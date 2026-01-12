@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -57,9 +58,9 @@ public class JwtTokenService implements TokenService {
         Instant exp = now.plus(Duration.ofMillis(expiration));
 
         return Jwts.builder()
-                .id(java.util.UUID.randomUUID().toString())
+                .id(UUID.randomUUID().toString())
                 .subject(user.getUsername())
-                .claim("id", user.getId())
+                .claim("id", user.getId() != null ? user.getId().toString() : null)
                 .claim("email", user.getEmail())
                 .claim("name", user.getName())
                 .claim("roles", user.getRoleCodes())
@@ -112,7 +113,24 @@ public class JwtTokenService implements TokenService {
 
     @Override
     public Single<Integer> extractUserId(String token) {
-        return getClaim(token, claims -> claims.get("id", Integer.class));
+        return getClaim(token, claims -> {
+            Object id = claims.get("id");
+            if (id instanceof String) {
+                // UUID stored as string
+                return null; // Use extractUserUUID instead
+            }
+            return (Integer) id;
+        });
+    }
+
+    public Single<UUID> extractUserUUID(String token) {
+        return getClaim(token, claims -> {
+            Object id = claims.get("id");
+            if (id instanceof String) {
+                return UUID.fromString((String) id);
+            }
+            return (UUID) id;
+        });
     }
 
     @Override
@@ -123,13 +141,23 @@ public class JwtTokenService implements TokenService {
     @Override
     @SuppressWarnings("unchecked")
     public Single<SecurityUser> getSecurityUser(String token) {
-        return getClaim(token, claims -> SecurityUser.builder()
-                .id(claims.get("id", Integer.class))
-                .username(claims.getSubject())
-                .email(claims.get("email", String.class))
-                .name(claims.get("name", String.class))
-                .roleCodes((List<String>) claims.get("roles", List.class))
-                .build());
+        return getClaim(token, claims -> {
+            Object idObj = claims.get("id");
+            UUID userId;
+            if (idObj instanceof String) {
+                userId = UUID.fromString((String) idObj);
+            } else {
+                userId = (UUID) idObj;
+            }
+            
+            return SecurityUser.builder()
+                    .id(userId)
+                    .username(claims.getSubject())
+                    .email(claims.get("email", String.class))
+                    .name(claims.get("name", String.class))
+                    .roleCodes((List<String>) claims.get("roles", List.class))
+                    .build();
+        });
     }
 
     @Override
