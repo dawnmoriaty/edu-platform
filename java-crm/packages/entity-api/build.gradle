@@ -1,0 +1,9 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.eduplatform.packages.entity'
+
+dependencies {
+    implementation project(':packages:common')
+}

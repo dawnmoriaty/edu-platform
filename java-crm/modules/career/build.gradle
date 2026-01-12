@@ -1,0 +1,21 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.eduplatform.modules.career'
+
+dependencies {
+    implementation project(':packages:common')
+    implementation project(':packages:entity-api')
+    implementation project(':packages:auth-rbac')
+    implementation project(':packages:infra-jooq')
+    implementation project(':modules:identity')
+    
+    // Vert.x & Reactive
+    implementation libs.bundles.vertx
+    implementation libs.rxjava
+    
+    // Spring
+    implementation 'org.springframework:spring-context'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

@@ -1,0 +1,43 @@
+plugins {
+    id 'application'
+    alias libs.plugins.spring.boot
+}
+
+group = 'com.eduplatform.apps.api'
+
+dependencies {
+    // Modules
+    implementation project(':modules:identity')
+    implementation project(':modules:training')
+    implementation project(':modules:career')
+    implementation project(':modules:finance')
+    
+    // Packages
+    implementation project(':packages:common')
+    implementation project(':packages:entity-api')
+    implementation project(':packages:auth-rbac')
+    implementation project(':packages:infra-jooq')
+    
+    // Spring Boot
+    implementation libs.spring.boot.starter.web
+    implementation libs.spring.boot.starter.validation
+    
+    // Database
+    implementation libs.postgresql
+    implementation libs.flyway.core
+    implementation libs.flyway.postgres
+    
+    // Environment
+    implementation libs.spring.dotenv
+    
+    // Test
+    testImplementation libs.spring.boot.starter.test
+}
+
+application {
+    mainClass = 'com.eduplatform.EduPlatformApplication'
+}
+
+bootRun {
+    systemProperty 'spring.profiles.active', System.getenv('SPRING_PROFILES_ACTIVE') ?: 'dev'
+}

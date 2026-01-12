@@ -5,18 +5,26 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'java-crm'
+rootProject.name = 'edu-crm'
 
-include 'entity-share'
-include 'crm-base'
-include 'shared-kernel'
-include 'security-module:security-core'
-include 'security-module:security-jwt'
-include 'security-module:security-oauth2'
-include 'security-module:security-rbac'
-include 'grpc-service'
-include 'crm-module:crm-domain'
-include 'crm-module:crm-application'
-include 'crm-module:crm-infrastructure'
-include 'crm-module:crm-api'
-include 'app'
+// ====== PACKAGES (Shared Libraries) ======
+include 'packages:common'
+include 'packages:entity-api'
+include 'packages:auth-rbac'
+include 'packages:infra-jooq'
+
+// ====== MODULES (Business Features) ======
+// Identity Module - User, Auth, RBAC
+include 'modules:identity'
+
+// Training Module - Student, Teacher, Faculty, Major, Class
+include 'modules:training'
+
+// Career Module - Enterprise, JobPosting, CV
+include 'modules:career'
+
+// Finance Module - Wallet, Tuition, Payroll
+include 'modules:finance'
+
+// ====== APPS (Runnable Applications) ======
+include 'apps:api'

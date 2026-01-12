@@ -1,0 +1,19 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.eduplatform.packages.infra.jooq'
+
+dependencies {
+    implementation project(':packages:common')
+    
+    api libs.jooq
+    api libs.hikari
+    api libs.postgresql
+    
+    // Vert.x Reactive DB Client
+    api libs.bundles.vertx.db
+    
+    implementation 'org.springframework:spring-context'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+}

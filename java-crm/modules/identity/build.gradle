@@ -1,0 +1,26 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.eduplatform.modules.identity'
+
+dependencies {
+    implementation project(':packages:common')
+    implementation project(':packages:entity-api')
+    implementation project(':packages:auth-rbac')
+    implementation project(':packages:infra-jooq')
+    
+    // Vert.x & Reactive
+    implementation libs.bundles.vertx
+    implementation libs.rxjava
+    
+    // Spring
+    implementation 'org.springframework:spring-context'
+    implementation libs.spring.boot.starter.validation
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // BCrypt for password
+    implementation libs.jbcrypt
+}

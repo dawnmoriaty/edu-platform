@@ -1,8 +1,7 @@
 plugins {
     alias(libs.plugins.spring.boot) apply false
-    alias(libs.plugins.spring.dependency.management)
-    alias(libs.plugins.jooq) apply false
-    alias(libs.plugins.protobuf) apply false
+    alias(libs.plugins.spring.dependency)
+    alias(libs.plugins.dotenv)
 }
 
 allprojects {
@@ -21,13 +20,13 @@ subprojects {
 
     dependencyManagement {
         imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:${libs.versions.spring.boot.get()}"
+            mavenBom libs.boms.spring.get().toString()
         }
     }
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+            languageVersion = JavaLanguageVersion.of(21)
         }
     }
 
@@ -38,5 +37,12 @@ subprojects {
 
     tasks.withType(Test) {
         useJUnitPlatform()
+    }
+
+    dependencies {
+        compileOnly libs.lombok
+        annotationProcessor libs.lombok
+        
+        implementation libs.jakarta.annotation
     }
 }

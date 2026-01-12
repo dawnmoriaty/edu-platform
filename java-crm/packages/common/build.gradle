@@ -1,0 +1,23 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.eduplatform.packages.common'
+
+dependencies {
+    // Vert.x & Reactive
+    api libs.bundles.vertx
+    api libs.rxjava
+    
+    // Spring Context
+    implementation 'org.springframework:spring-context'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    
+    // JSON
+    api libs.bundles.jackson
+    
+    // Utilities
+    api libs.commons.lang3
+    
+    compileOnly libs.jakarta.servlet
+}

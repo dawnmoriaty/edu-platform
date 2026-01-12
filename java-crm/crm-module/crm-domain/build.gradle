@@ -1,4 +1,0 @@
-dependencies {
-    // Shared Kernel
-    implementation project(':shared-kernel')
-}
