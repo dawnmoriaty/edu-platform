@@ -1,8 +1,15 @@
-.PHONY: build clean test migrate-up migrate-down sqlc help
+.PHONY: build clean test migrate-up migrate-down sqlc proto help
 
 # Build the service
 build:
 	go build -o bin/social-service ./main.go
+
+# Generate protobuf code for gRPC
+proto:
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		proto/*.proto
+	@echo "Generated gRPC code in internal/grpc/authpb/"
 
 # Clean build artifacts
 clean:
@@ -37,4 +44,5 @@ help:
 	@echo "  migrate-up   - Run migrations up"
 	@echo "  migrate-down - Run migrations down"
 	@echo "  sqlc         - Generate sqlc code from queries"
+	@echo "  proto        - Generate gRPC code from proto files"
 	@echo "  run          - Build and run the service"

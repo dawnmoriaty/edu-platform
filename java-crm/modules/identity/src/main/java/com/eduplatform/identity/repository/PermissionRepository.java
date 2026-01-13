@@ -4,9 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
-import org.jooq.Record;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
+
+import com.eduplatform.identity.record.PermissionInfo;
 
 import java.util.*;
 
@@ -227,17 +228,4 @@ public class PermissionRepository {
             }
         }
     }
-
-    // ==================== INNER CLASS ====================
-
-    /**
-     * Simple DTO cho permission info
-     */
-    public record PermissionInfo(
-            UUID id,
-            String name,
-            String resource,
-            String action,
-            String description
-    ) {}
 }

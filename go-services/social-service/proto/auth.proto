@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/eduplatform/go-services/social-service/internal/grpc/authpb";
+
+// AuthService - gRPC service gọi sang Java CRM để xác thực
+service AuthService {
+  // Validate JWT token và trả về thông tin user
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  
+  // Kiểm tra quyền của user
+  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse);
+  
+  // Lấy thông tin user
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+// ============================================
+// Token Validation
+// ============================================
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  UserInfo user = 2;
+  string error = 3;
+}
+
+// ============================================
+// Permission Check
+// ============================================
+
+message CheckPermissionRequest {
+  string user_id = 1;
+  string resource = 2;  // e.g., "post", "comment"
+  string action = 3;    // e.g., "create", "update", "delete", "view"
+}
+
+message CheckPermissionResponse {
+  bool allowed = 1;
+  string error = 2;
+}
+
+// ============================================
+// User Info
+// ============================================
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  UserInfo user = 1;
+  string error = 2;
+}
+
+message UserInfo {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  repeated string roles = 4;
+  repeated string permissions = 5;
+}

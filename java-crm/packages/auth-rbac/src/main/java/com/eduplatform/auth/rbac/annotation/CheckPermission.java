@@ -8,25 +8,19 @@ import java.lang.annotation.Target;
 /**
  * CheckPermission - Annotation để check permission dựa trên URI
  * 
- * Usage:
- * <pre>
- * public class ContactHandler extends BaseHandler {
- *     private static final String URI = "/contact/";
- *     
- *     @CheckPermission(action = "VIEW")
- *     public Handler<RoutingContext> list() { ... }
- *     
- *     @CheckPermission(action = "ADD")
- *     public Handler<RoutingContext> create() { ... }
- * }
- * </pre>
+ * @deprecated Use {@link com.eduplatform.common.vertx.annotation.RequirePermission} instead.
+ * RequirePermission uses Action enum (type-safe) and is auto-checked by VertxRoutingBinder.
  * 
- * Hoặc override URI:
+ * Migration:
  * <pre>
- *     @CheckPermission(uri = "/custom/", action = "DELETE")
- *     public Handler<RoutingContext> delete() { ... }
+ * // Old:
+ * @CheckPermission(uri = "/user/", action = "VIEW")
+ * 
+ * // New:
+ * @RequirePermission(resource = "USER", action = Action.VIEW)
  * </pre>
  */
+@Deprecated(since = "2.0", forRemoval = true)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface CheckPermission {
