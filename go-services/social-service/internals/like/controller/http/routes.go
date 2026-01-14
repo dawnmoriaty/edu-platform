@@ -13,10 +13,10 @@ func Routes(r *gin.RouterGroup, queries *db.Queries) {
 	likeUseCase := usecase.NewLikeUseCase(likeRepo)
 	likeHandler := NewLikeHandler(likeUseCase)
 
-	likes := r.Group("/posts/:postId/likes")
+	likes := r.Group("/likes")
 	{
-		likes.POST("", likeHandler.LikePost)
-		likes.DELETE("", likeHandler.UnlikePost)
-		likes.GET("", likeHandler.GetLikeStatus)
+		likes.POST("/post/:postId", likeHandler.LikePost)
+		likes.DELETE("/post/:postId", likeHandler.UnlikePost)
+		likes.GET("/post/:postId/status", likeHandler.GetLikeStatus)
 	}
 }

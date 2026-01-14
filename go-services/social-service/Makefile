@@ -1,15 +1,11 @@
-.PHONY: build clean test migrate-up migrate-down sqlc proto help
+.PHONY: build clean test migrate-up migrate-down migrate-reset seed sqlc run dev help
+
+# Variables
+DB_URL ?= postgres://root:123456@localhost:5432/social_db?sslmode=disable
 
 # Build the service
 build:
-	go build -o bin/social-service ./main.go
-
-# Generate protobuf code for gRPC
-proto:
-	protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		proto/*.proto
-	@echo "Generated gRPC code in internal/grpc/authpb/"
+	go build -o bin/social-service ./cmd/app/main.go
 
 # Clean build artifacts
 clean:
@@ -21,28 +17,47 @@ test:
 
 # Run migrations up
 migrate-up:
-	goose -dir db/migrations postgres "host=localhost port=5432 user=root password=123456 dbname=edu_crm_db sslmode=disable" up
+	goose -dir db/migrations postgres "$(DB_URL)" up
 
 # Run migrations down
 migrate-down:
-	goose -dir db/migrations postgres "host=localhost port=5432 user=root password=123456 dbname=edu_crm_db sslmode=disable" down
+	goose -dir db/migrations postgres "$(DB_URL)" down
+
+# Reset database (down all then up)
+migrate-reset:
+	goose -dir db/migrations postgres "$(DB_URL)" reset
+	goose -dir db/migrations postgres "$(DB_URL)" up
+
+# Seed database with sample data
+seed:
+	psql "$(DB_URL)" -f db/seeds/seed.sql
 
 # Generate sqlc code
 sqlc:
 	sqlc generate
 
-# Run the service
+# Run the service (development)
+dev:
+	go run ./cmd/app/main.go
+
+# Run the service (production build)
 run: build
 	./bin/social-service
+
+# Setup: migrate and seed
+setup: migrate-up seed
 
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  build        - Build the service"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  test         - Run tests"
-	@echo "  migrate-up   - Run migrations up"
-	@echo "  migrate-down - Run migrations down"
-	@echo "  sqlc         - Generate sqlc code from queries"
-	@echo "  proto        - Generate gRPC code from proto files"
-	@echo "  run          - Build and run the service"
+	@echo "  build         - Build the service"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  test          - Run tests"
+	@echo "  migrate-up    - Run migrations up"
+	@echo "  migrate-down  - Run migrations down"
+	@echo "  migrate-reset - Reset database and run migrations"
+	@echo "  seed          - Seed database with sample data"
+	@echo "  setup         - Run migrations and seed"
+	@echo "  sqlc          - Generate sqlc code from queries"
+	@echo "  dev           - Run in development mode"
+	@echo "  run           - Build and run the service"

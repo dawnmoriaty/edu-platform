@@ -17,10 +17,8 @@ func Routes(r *gin.RouterGroup, pool *pgxpool.Pool, queries *sqlc.Queries) {
 	comments := r.Group("/comments")
 	{
 		comments.POST("", commentHandler.CreateComment)
+		comments.GET("/post/:postId", commentHandler.GetComments)
 		comments.PUT("/:id", commentHandler.UpdateComment)
 		comments.DELETE("/:id", commentHandler.DeleteComment)
 	}
-
-	// Post comments
-	r.GET("/posts/:postId/comments", commentHandler.GetComments)
 }

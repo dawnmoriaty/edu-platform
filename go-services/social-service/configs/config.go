@@ -47,7 +47,7 @@ func LoadConfig() *Config {
 		Environment:   getEnv("APP_ENV", DevelopmentEnv),
 		HttpPort:      getEnvInt("HTTP_PORT", 8081),
 		GrpcPort:      getEnvInt("GRPC_PORT", 50052),
-		DatabaseURI:   getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/social_db?sslmode=disable"),
+		DatabaseURI:   getEnv("DATABASE_URL", "postgres://root:123456@localhost:5432/social_db?sslmode=disable"),
 		RedisURI:      getEnv("REDIS_URI", "localhost:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       getEnvInt("REDIS_DB", 0),

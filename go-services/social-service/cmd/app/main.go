@@ -14,7 +14,6 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg := configs.LoadConfig()
 	logger.Initialize(cfg.Environment)
 
@@ -26,7 +25,6 @@ func main() {
 		logger.Fatal("Cannot connect to database: ", err)
 	}
 	defer database.Close()
-	logger.Info("Database connected successfully")
 
 	// Connect to Redis
 	redisClient, err := redis.NewRedis(redis.Config{
@@ -37,14 +35,12 @@ func main() {
 	if err != nil {
 		logger.Fatal("Cannot connect to Redis: ", err)
 	}
-	logger.Info("Redis connected successfully")
 
 	// Initialize WebSocket hub
 	hub := ws.NewHub()
 	go hub.Run()
-	logger.Info("WebSocket hub started")
 
-	// Create and run HTTP server
+	// Create HTTP server
 	server := httpServer.NewServer(database, redisClient, hub)
 
 	// Graceful shutdown

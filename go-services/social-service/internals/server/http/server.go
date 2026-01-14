@@ -31,8 +31,13 @@ func NewServer(
 	cache redis.IRedis,
 	hub *ws.Hub,
 ) *Server {
+	// Disable Gin's default logging
+	gin.SetMode(gin.ReleaseMode)
+	engine := gin.New()
+	engine.Use(gin.Recovery())
+
 	return &Server{
-		engine: gin.Default(),
+		engine: engine,
 		cfg:    configs.GetConfig(),
 		db:     database,
 		cache:  cache,
@@ -42,9 +47,6 @@ func NewServer(
 
 func (s *Server) Run() error {
 	_ = s.engine.SetTrustedProxies(nil)
-	if s.cfg.Environment == configs.ProductionEnv {
-		gin.SetMode(gin.ReleaseMode)
-	}
 
 	// CORS middleware
 	s.engine.Use(corsMiddleware())
